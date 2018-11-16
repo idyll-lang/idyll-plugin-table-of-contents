@@ -1,24 +1,65 @@
 const AST = require('idyll-ast');
 
+const formatId = function(text) {
+    return text.replace(/['"]+/g, '').replace(/[\W_]+/g,"-");
+}
+
+const getText = function (node) {
+    const texts = [];
+    AST.walkNodes(AST.getChildren(node), (n) => {
+        if (typeof n === 'string') {
+            texts.push(n);
+        }
+    })
+    return texts.join('');
+}
+
 module.exports = (ast) => {
-    let headings = AST.getNodesByName(ast, 'h1');
-    let tags = ['Table of Contents'];
-    headings.forEach((node) => {
-        let text = AST.getText(node);
-        let href = '#' + text.replace(/['"]+/g, '');
-        let element = AST.createNode('a', {href}, [text])
-        tags.push(AST.createNode('li', {}, [element]));
+    var timeBegin = process.hrtime();
+    console.log('Generating table of contents...');
+    let headings = AST.findNodes(ast, (node) => {
+        let type = node[0].toLowerCase();
+        return type === 'h1' || type == 'h2';
     });
-    let tagNames = AST.createNode('h2',{id: 'tableofcontents'}, tags);
-    let list = AST.createNode('ul', {id: 'list'}, [tagNames])
-    let ASTwithID = AST.modifyNodesByName(ast, 'h1', (node) => {
-        node = AST.setProperty(node, 'id', AST.getText(node))
+    let tags = [];
+    let h = 'h1';
+    tags['h1'] = [];
+    tags['h2'] = [];
+    headings.forEach((node) => {
+        let text = getText(node);
+        let href = '#' + formatId(text);
+        let type = node[0].toLowerCase();
+        let element = AST.createNode('a', { href }, [text]);
+        //console.log(node, text, href, type, element)
+
+        if (h !== type && type === 'h1') {
+            tags[type].push(AST.createNode('ul', { id: 'list' }, tags['h2']));
+            tags['h2'] = [];
+        }
+        tags[type].push(AST.createNode('li', {}, [element]));
+        h = type;
+    });
+    if (h === 'h2' && tags['h2'] !== []) {
+        tags['h1'].push(AST.createNode('ul', { id: 'list' }, tags['h2']));
+        tags['h2'] = [];
+    }
+    let list = AST.createNode('ul', { id: 'list' }, tags['h1'])
+    let ASTwithID = ast;
+    ASTwithID = AST.modifyNodesByName(ASTwithID, 'h1', (node) => {
+        node = AST.setProperty(node, 'id', formatId(getText(node)))
         return node;
     });
-
-    let textContainer = AST.createNode('TextContainer', {}, [list])
+    ASTwithID = AST.modifyNodesByName(ASTwithID, 'h2', (node) => {
+        node = AST.setProperty(node, 'id', formatId(getText(node)))
+        return node;
+    });
+    let tocTitle = AST.createNode('h1', { id: 'tableofcontents' }, ['Table Of Contents']);
+    let textContainer = AST.createNode('div', { id: 'tocContainer' }, [tocTitle, list])
     ASTwithID = AST.modifyNodesByName(ASTwithID, 'TableOfContents', (node) => {
         return textContainer;
     });
+    var timeEnd = process.hrtime(timeBegin);
+    var timeTaken = parseFloat(timeEnd[0]) + parseFloat(timeEnd[1]) / Math.pow(10, 9);
+    console.log('Generating table of contents done in %f seconds', timeTaken);
     return ASTwithID;
 };
