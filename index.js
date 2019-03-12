@@ -1,4 +1,5 @@
-const AST = require('idyll-ast');
+const { convertV1ToV2, convertV2ToV1 } = require('idyll-ast').converters;
+const AST = require('idyll-ast/v1');
 
 const formatId = function(text) {
     return text.replace(/['"]+/g, '').replace(/[\W_]+/g,"-");
@@ -15,6 +16,7 @@ const getText = function (node) {
 }
 
 module.exports = (ast) => {
+    ast = convertV2ToV1(convertV2ToV1);
     var timeBegin = process.hrtime();
     console.log('Generating table of contents...');
     let headings = AST.findNodes(ast, (node) => {
@@ -61,5 +63,5 @@ module.exports = (ast) => {
     var timeEnd = process.hrtime(timeBegin);
     var timeTaken = parseFloat(timeEnd[0]) + parseFloat(timeEnd[1]) / Math.pow(10, 9);
     console.log('Generating table of contents done in %f seconds', timeTaken);
-    return ASTwithID;
+    return convertV1ToV2(ASTwithID);
 };
